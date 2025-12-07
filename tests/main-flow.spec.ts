@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 const serviceURL = 'http://localhost:3000';
 const backendURL = 'http://localhost:8080';
 
-test('default flow with mock', async ({page}) => {
+test('TL-21-1 default flow with mock', async ({page}) => {
     const amountValue: string = '22.3'
     const amountResponse = {paymentAmountMonthly: amountValue};
 
@@ -21,7 +21,7 @@ test('default flow with mock', async ({page}) => {
     expect(monthlyValue).toBe(amountValue);
 })
 
-test('main flow', async ({ page }) => {
+test('TL-21-2 main flow', async ({ page }) => {
   await page.goto(serviceURL);
   await page.getByTestId('id-small-loan-calculator-field-apply').click();
   await page.getByTestId('login-popup-username-input').click();
@@ -33,7 +33,7 @@ test('main flow', async ({ page }) => {
   await page.getByTestId('final-page-success-ok-button').click();
 });
 
-test('redirect flow', async ({ page, request }) => {
+test('TL-21-3 redirect flow', async ({ page, request }) => {
   await page.goto(serviceURL);
   await page.getByTestId('id-image-element-button-image-1').click();
   await expect( page.getByTestId('id-small-loan-calculator-field-apply') ).toBeInViewport()
@@ -41,7 +41,7 @@ test('redirect flow', async ({ page, request }) => {
   await expect( page.getByTestId('id-small-loan-calculator-field-apply') ).toBeInViewport()
 })
 
-test('mocked loan calc', async ({ page }) => {
+test('TL-21-4 mocked loan calc', async ({ page }) => {
     await page.route(`**/api/loan-calc*`, async route => {
         // const url = route.request().url();
         // const newUrl = url.replace("1000", "1200");
@@ -63,7 +63,7 @@ test('mocked loan calc', async ({ page }) => {
     expect(await calculationSpan.innerText()).not.toHaveLength(0);
 })
 
-test("negative test (400 status code)", async ({page}) => {
+test("TL-21-5 negative test (400 status code)", async ({page}) => {
     await page.route(`**/api/loan-calc*`, async route => {
         await route.fulfill({
             status: 400
@@ -76,3 +76,52 @@ test("negative test (400 status code)", async ({page}) => {
     const errorSpan = page.getByTestId("id-small-loan-calculator-field-error");
     await expect(errorSpan).toBeVisible();
 })
+
+test("TL-21-6 negative test without body (500 status code)", async ({page}) => {
+    await page.route(`**/api/loan-calc*`, async route => {
+        await route.fulfill({
+            status: 500
+        });
+    });
+    const loanCalcResponse = page.waitForResponse(`**/api/loan-calc*`);
+    await page.goto(serviceURL);
+    await loanCalcResponse;
+
+    const errorSpan = page.getByTestId("id-small-loan-calculator-field-error");
+    await expect(errorSpan).toBeVisible();
+})
+
+test("TL-21-7 test without body (200 status code)", async ({page}) => {
+    await page.route(`**/api/loan-calc*`, async route => {
+        await route.fulfill({
+            status: 200
+        });
+    });
+    const loanCalcResponse = page.waitForResponse(`**/api/loan-calc*`);
+    await page.goto(serviceURL);
+    await loanCalcResponse;
+
+    const monthlyPaymentSpan = page.getByTestId("ib-small-loan-calculator-field-monthlyPayment");
+    await expect(monthlyPaymentSpan).toHaveText("undefined €");
+})
+
+test("TL-21-8 test with wrong key in body (200 status code)", async ({page}) => {
+    const wrongResponse = {paymentAmount: 400};
+    await page.route(`**/api/loan-calc*`, async route => {
+        await route.fulfill({
+            status: 200,
+            json: wrongResponse
+        });
+    });
+    const loanCalcResponse = page.waitForResponse(`**/api/loan-calc*`);
+    await page.goto(serviceURL);
+    await loanCalcResponse;
+
+    const monthlyPaymentSpan = page.getByTestId("ib-small-loan-calculator-field-monthlyPayment");
+    await expect(monthlyPaymentSpan).toHaveText("undefined €");
+})
+
+
+
+
+
